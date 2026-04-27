@@ -15,19 +15,43 @@ const officesOpenOn    = dow => Object.values(OFFICES).filter(o=>o.hours[dow]!=n
 const getOfficesForDay = (dow,eecpOnly=false) => { const o=officesOpenOn(dow); return eecpOnly?o.filter(x=>x.hasEecp):o; };
 
 // ─── Services ─────────────────────────────────────────────────────────────────
-const ALL_SERVICES = [
-  { id:"omt60",          name:"Osteopathic Manual Therapy",  duration:"60 min",        price:200, mins:60,  eecpOnly:false, description:"Hands-on therapy working with your body's structure, nervous system, and natural healing rhythms." },
-  { id:"omt30",          name:"Osteopathic Manual Therapy",  duration:"30 min",        price:100, mins:30,  eecpOnly:false, description:"A focused hands-on session addressing a specific area or concern." },
-  { id:"softwave",       name:"SoftWave Shockwave Therapy",  duration:"15 min",        price:150, mins:15,  eecpOnly:false, description:"Non-invasive cellular healing for chronic pain, injuries, and post-surgical recovery." },
-  { id:"softwave-addon", name:"Add SoftWave to Session",     duration:"No extra time", price:100, mins:0,   eecpOnly:false, tag:"Add-on",     description:"Enhance your existing session with SoftWave therapy — no extra time needed." },
-  { id:"eecp",           name:"EECP Heart Therapy",          duration:"75 min",        price:150, mins:75,  eecpOnly:true,  description:"FDA-cleared therapy improving circulation, reducing chest pain, and restoring energy." },
-  { id:"softwave-intro", name:"SoftWave Intro Special",      duration:"30 min",        price:79,  mins:30,  eecpOnly:false, tag:"Intro Offer", description:"Experience SoftWave at a special introductory rate." },
-  { id:"eecp-intro",     name:"EECP Intro Special",          duration:"30 min",        price:79,  mins:30,  eecpOnly:true,  tag:"Intro Offer", description:"Try EECP Heart Therapy at an introductory rate." },
-  { id:"consult",        name:"Free Initial Consultation",   duration:"15 min",        price:0,   mins:15,  eecpOnly:false, description:"Discuss your health concerns with Bob." },
+// Grouped into 3 columns
+const SERVICE_COLUMNS = [
+  {
+    label: "Osteopathic Manual Therapy",
+    color: "#b9875a",
+    services: [
+      { id:"omt30",  name:"30 min Session",  duration:"30 min", price:100, mins:30, eecpOnly:false, description:"A focused hands-on session addressing a specific area or concern." },
+      { id:"omt60",  name:"60 min Session",  duration:"60 min", price:200, mins:60, eecpOnly:false, description:"Hands-on therapy working with your body's structure, nervous system, and natural healing rhythms." },
+      { id:"omt90",  name:"90 min Session",  duration:"90 min", price:300, mins:90, eecpOnly:false, description:"An extended session for complex cases or whole-body integration work." },
+    ],
+  },
+  {
+    label: "SoftWave Shockwave Therapy",
+    color: "#6a7fa8",
+    services: [
+      { id:"softwave-addon", name:"Add SoftWave to Session", duration:"No extra time", price:100, mins:0,  eecpOnly:false, tag:"Add-on",     description:"Enhance your existing session with SoftWave therapy — no extra time needed." },
+      { id:"softwave",       name:"SoftWave Session",        duration:"15 min",        price:150, mins:15, eecpOnly:false, description:"Non-invasive cellular healing for chronic pain, injuries, and post-surgical recovery." },
+      { id:"softwave-intro", name:"SoftWave Intro Special",  duration:"30 min",        price:79,  mins:30, eecpOnly:false, tag:"Intro Offer", description:"Experience your first SoftWave session at a special introductory rate." },
+    ],
+  },
+  {
+    label: "EECP Heart Therapy",
+    color: "#7a4a7a",
+    services: [
+      { id:"eecp",         name:"EECP Session",       duration:"75 min", price:150,  mins:75, eecpOnly:true, description:"FDA-cleared therapy improving circulation, reducing chest pain, and restoring energy." },
+      { id:"eecp-pkg",     name:"EECP Package of 12", duration:"12 × 75 min", price:1600, mins:75, eecpOnly:true, description:"Complete 12 of 36 recommended sessions. Save $200 versus individual sessions.", saveBadge:"Save $200" },
+      { id:"eecp-consult", name:"Consultation",        duration:"15 min", price:0,    mins:15, eecpOnly:true, description:"Discuss what type of therapy is right for you — at no charge." },
+    ],
+  },
 ];
 
+// Flat list for logic lookups
+const ALL_SERVICES = SERVICE_COLUMNS.flatMap(col => col.services);
+const EECP_IDS = ["eecp","eecp-pkg","eecp-consult","eecp-intro"];
+
 // ─── Scheduling Logic ─────────────────────────────────────────────────────────
-const SLOT_INTERVAL=15, EECP_SETUP=15, EECP_IDS=["eecp","eecp-intro"];
+const SLOT_INTERVAL=15, EECP_SETUP=15;
 const DISPLAY_START=9*60, DISPLAY_END=18*60, PX_PER_MIN=1;
 const TOTAL_H=(DISPLAY_END-DISPLAY_START)*PX_PER_MIN;
 const HOUR_ROWS=Array.from({length:(DISPLAY_END-DISPLAY_START)/60},(_,i)=>DISPLAY_START+i*60);
@@ -83,23 +107,31 @@ const css=`
 .bk-body{max-width:980px;margin:0 auto;padding:36px 20px 80px}
 .bk-h2{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:500;margin-bottom:5px}
 .bk-p{font-size:13px;color:#9a8a7e;margin-bottom:20px;font-weight:300}
-.view-toggle{display:inline-flex;background:white;border-radius:8px;border:1px solid #e0d8d0;overflow:hidden;margin-bottom:20px}
-.view-btn{padding:8px 18px;font-size:12px;font-family:'Jost',sans-serif;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border:none;background:transparent;color:#9a8a7e;transition:all .15s;display:flex;align-items:center;gap:6px}
-.view-btn.active{background:#1e1a17;color:#c9a07a}.view-btn:hover:not(.active){background:#f5f0ea}
-.bk-services{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:12px}
+
+/* ── 3-column service grid ── */
+.bk-svc-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start}
+@media(max-width:720px){.bk-svc-cols{grid-template-columns:1fr}}
+.bk-svc-col{display:flex;flex-direction:column;gap:10px}
+.bk-col-header{padding:10px 14px;border-radius:8px 8px 0 0;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:500;color:white;margin-bottom:2px}
 .bk-svc{background:white;border-radius:10px;padding:18px;border:2px solid transparent;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
-.bk-svc::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#b9875a,#c9a07a);transform:scaleX(0);transform-origin:left;transition:transform .3s}
+.bk-svc::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;transform:scaleX(0);transform-origin:left;transition:transform .3s}
 .bk-svc:hover{border-color:#e8ddd4;box-shadow:0 4px 16px rgba(0,0,0,.06)}.bk-svc:hover::after,.bk-svc.sel::after{transform:scaleX(1)}
-.bk-svc.sel{border-color:#b9875a}
+.bk-svc.sel{border-color:var(--col-color,#b9875a)}
 .bk-svc-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
 .bk-svc-name{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:600;color:#1e1a17;line-height:1.2}
 .bk-svc-price{font-size:16px;font-weight:500;color:#b9875a;white-space:nowrap;margin-left:8px}
 .bk-svc-dur{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#b0a090;margin-bottom:6px}
 .bk-svc-desc{font-size:12px;color:#7a6a5e;line-height:1.5;font-weight:300}
-.bk-chk{position:absolute;top:12px;right:12px;width:18px;height:18px;border-radius:50%;background:#b9875a;color:white;display:flex;align-items:center;justify-content:center;font-size:10px;opacity:0;transition:opacity .2s}
+.bk-chk{position:absolute;top:12px;right:12px;width:18px;height:18px;border-radius:50%;color:white;display:flex;align-items:center;justify-content:center;font-size:10px;opacity:0;transition:opacity .2s;background:var(--col-color,#b9875a)}
 .bk-svc.sel .bk-chk{opacity:1}
 .bk-tag{display:inline-flex;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
-.bk-tag-i{background:#fef3e2;color:#c17f24}.bk-tag-a{background:#e8f4ee;color:#2d7a4f}
+.bk-tag-i{background:#fef3e2;color:#c17f24}.bk-tag-a{background:#e8f4ee;color:#2d7a4f}.bk-tag-b{background:#f3e8fe;color:#7a2d9a}
+.save-badge{display:inline-flex;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;background:#1e1a17;color:#c9a07a;margin-top:6px;letter-spacing:.5px}
+
+.view-toggle{display:inline-flex;background:white;border-radius:8px;border:1px solid #e0d8d0;overflow:hidden;margin-bottom:20px}
+.view-btn{padding:8px 18px;font-size:12px;font-family:'Jost',sans-serif;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border:none;background:transparent;color:#9a8a7e;transition:all .15s;display:flex;align-items:center;gap:6px}
+.view-btn.active{background:#1e1a17;color:#c9a07a}.view-btn:hover:not(.active){background:#f5f0ea}
+
 .list-dates{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:20px}
 .list-date{display:flex;flex-direction:column;align-items:center;padding:10px 9px;border-radius:10px;background:white;border:2px solid transparent;cursor:pointer;transition:all .15s;min-width:50px}
 .list-date:hover:not(.closed){border-color:#e8ddd4}.list-date.sel{background:#1e1a17;border-color:#1e1a17}.list-date.closed{opacity:.3;cursor:not-allowed}
@@ -235,7 +267,6 @@ export default function BookingPage() {
     if(!canSubmit) return;
     setLoading(true); setError(null);
     try {
-      // 1. Save to Supabase
       const dbRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
         method: "POST",
         headers: {
@@ -266,7 +297,6 @@ export default function BookingPage() {
         throw new Error("Database error: " + err);
       }
 
-      // 2. Send emails via Resend
       const DAYS_F2   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
       const MONTHS_S2 = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
       const dateFormatted = `${DAYS_F2[selDate.getDay()]}, ${MONTHS_S2[selDate.getMonth()]} ${selDate.getDate()}`;
@@ -277,7 +307,6 @@ export default function BookingPage() {
 
       const bobHtml = `<div style="font-family:Georgia,serif;max-width:520px;margin:0 auto"><div style="background:#1e1a17;padding:24px;text-align:center"><h1 style="color:#c9a07a;font-size:22px;margin:0">New Booking: ${clientName}</h1></div><div style="padding:28px;background:#fdf9f5"><table style="width:100%;font-size:13px;border-collapse:collapse"><tr><td style="padding:7px 0;color:#9a8a7e;border-bottom:1px solid #f5f0eb">Client</td><td style="padding:7px 0;font-weight:600;border-bottom:1px solid #f5f0eb;text-align:right">${clientName}</td></tr><tr><td style="padding:7px 0;color:#9a8a7e;border-bottom:1px solid #f5f0eb">Email</td><td style="padding:7px 0;border-bottom:1px solid #f5f0eb;text-align:right">${form.email}</td></tr><tr><td style="padding:7px 0;color:#9a8a7e;border-bottom:1px solid #f5f0eb">Phone</td><td style="padding:7px 0;border-bottom:1px solid #f5f0eb;text-align:right">${form.phone}</td></tr><tr><td style="padding:7px 0;color:#9a8a7e;border-bottom:1px solid #f5f0eb">Service</td><td style="padding:7px 0;font-weight:600;border-bottom:1px solid #f5f0eb;text-align:right">${sel.name} (${sel.duration})</td></tr><tr><td style="padding:7px 0;color:#9a8a7e;border-bottom:1px solid #f5f0eb">Date & Time</td><td style="padding:7px 0;font-weight:600;border-bottom:1px solid #f5f0eb;text-align:right">${dateFormatted} at ${selTime}</td></tr><tr><td style="padding:7px 0;color:#9a8a7e;border-bottom:1px solid #f5f0eb">Office</td><td style="padding:7px 0;font-weight:600;border-bottom:1px solid #f5f0eb;text-align:right">${selectedOffice.name}</td></tr><tr><td style="padding:7px 0;color:#9a8a7e">Amount</td><td style="padding:7px 0;font-weight:600;color:#b9875a;text-align:right">${priceStr}</td></tr></table>${form.notes ? `<div style="margin-top:16px;padding:12px;background:#fdf8f4;border-radius:6px;border-left:3px solid #b9875a;font-size:13px;color:#5a4a3e"><strong>Notes:</strong><br/>${form.notes}</div>` : ""}</div></div>`;
 
-      // Emails sent best-effort — don't block confirmation on email success
       Promise.allSettled([
         fetch("https://api.resend.com/emails", {
           method: "POST",
@@ -289,7 +318,7 @@ export default function BookingPage() {
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${RESEND_KEY}` },
           body: JSON.stringify({ from: "Booking System <onboarding@resend.dev>", to: [BOB_EMAIL], subject: `New Booking: ${clientName} — ${dateFormatted} at ${selTime}`, html: bobHtml }),
         }),
-      ]).catch(() => {}); // ignore email errors — booking is already saved
+      ]).catch(() => {});
 
       setSubmitted(true);
     } catch(e) {
@@ -344,26 +373,66 @@ export default function BookingPage() {
 
       <div className="bk-body">
 
-        {/* Step 1 */}
+        {/* ── Step 1: Service Selection ── */}
         {step===1&&(<>
           <div className="bk-h2">Choose Your Treatment</div>
-          <div className="bk-p">Select a service — your office location shows automatically in the next step.</div>
-          <div className="bk-services">
-            {ALL_SERVICES.map(s=>(
-              <div key={s.id} className={`bk-svc ${service===s.id?"sel":""}`} onClick={()=>setService(s.id)}>
-                <div className="bk-chk">✓</div>
-                {s.tag&&<div className={`bk-tag ${s.tag==="Intro Offer"?"bk-tag-i":"bk-tag-a"}`}>{s.tag}</div>}
-                <div className="bk-svc-row"><div className="bk-svc-name">{s.name}</div><div className="bk-svc-price">{s.price===0?"Free":`$${s.price}`}</div></div>
-                <div className="bk-svc-dur">{s.duration}</div>
-                <div className="bk-svc-desc">{s.description}</div>
-                {s.eecpOnly&&<div style={{marginTop:6,fontSize:10,color:"#b9875a",fontStyle:"italic"}}>Nevada City only</div>}
+          <div className="bk-p">Select a service to get started — your office location appears automatically in the next step.</div>
+
+          <div className="bk-svc-cols">
+            {SERVICE_COLUMNS.map(col=>(
+              <div key={col.label} className="bk-svc-col">
+                {/* Column header */}
+                <div className="bk-col-header" style={{background:col.color}}>
+                  {col.label}
+                </div>
+
+                {/* Cards in this column */}
+                {col.services.map(s=>(
+                  <div
+                    key={s.id}
+                    className={`bk-svc ${service===s.id?"sel":""}`}
+                    style={{"--col-color": col.color}}
+                    onClick={()=>setService(s.id)}
+                  >
+                    {/* Top accent bar uses column color */}
+                    <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:col.color,transform:service===s.id||"scaleX(0)",transformOrigin:"left",transition:"transform .3s"}}/>
+                    <div className="bk-chk" style={{background:col.color}}>✓</div>
+
+                    {s.tag&&(
+                      <div className={`bk-tag ${s.tag==="Intro Offer"?"bk-tag-i":s.tag==="Best Value"?"bk-tag-b":"bk-tag-a"}`}>
+                        {s.tag}
+                      </div>
+                    )}
+
+                    <div className="bk-svc-row">
+                      <div className="bk-svc-name">{s.name}</div>
+                      <div className="bk-svc-price" style={{color:col.color}}>
+                        {s.price===0?"Free":`$${s.price}`}
+                      </div>
+                    </div>
+                    <div className="bk-svc-dur">{s.duration}</div>
+                    <div className="bk-svc-desc">{s.description}</div>
+
+                    {s.saveBadge&&(
+                      <div className="save-badge">✦ {s.saveBadge}</div>
+                    )}
+
+                    {s.eecpOnly&&(
+                      <div style={{marginTop:6,fontSize:10,color:col.color,fontStyle:"italic"}}>Nevada City only</div>
+                    )}
+                  </div>
+                ))}
               </div>
             ))}
           </div>
-          <div className="bk-nav"><span/><button className="bk-btn bk-btn-p" disabled={!canNext1} onClick={()=>setStep(2)}>Continue →</button></div>
+
+          <div className="bk-nav">
+            <span/>
+            <button className="bk-btn bk-btn-p" disabled={!canNext1} onClick={()=>setStep(2)}>Continue →</button>
+          </div>
         </>)}
 
-        {/* Step 2 */}
+        {/* ── Step 2: Date & Time ── */}
         {step===2&&(<>
           <div className="bk-h2">Select a Date & Time</div>
           <div className="bk-p">{isEecp?"EECP is available at Nevada City only. ":""}Thursdays have two offices: Auburn (9 AM–1 PM) and Nevada City (2–5 PM).</div>
@@ -496,7 +565,7 @@ export default function BookingPage() {
           </div>
         </>)}
 
-        {/* Step 3 */}
+        {/* ── Step 3: Contact Info ── */}
         {step===3&&(<>
           <div className="bk-sum">
             <div className="bk-sum-title">Booking Summary</div>
